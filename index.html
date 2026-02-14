@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PCR検査結果作成アプリ</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
@@ -10,29 +10,29 @@
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f4f8; max-width: 500px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { font-size: 1.2em; color: #333; margin-top: 0; }
+        h2 { font-size: 1.2em; color: #333; margin-top: 0; text-align: center; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #image-container { margin-top: 20px; border-radius: 8px; overflow: hidden; }
+        #image-container { margin-top: 20px; border-radius: 8px; overflow: hidden; background: #eee; min-height: 200px; }
         img { max-width: 100%; display: block; }
-        .status { font-size: 13px; color: #666; margin-top: 10px; text-align: center; }
+        .status { font-size: 13px; color: #666; margin-top: 10px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>🏥 PCR検査結果 PDF作成</h2>
+    <h2>🏥 PCR検査結果 PDF作成（とりあえず半角で書いて）</h2>
     <input type="text" id="patientName" placeholder="飼い主名">
     <input type="text" id="idNumber" placeholder="診察券番号">
     
-    <button onclick="document.getElementById('cameraInput').click()">📷 液晶を撮影</button>
-    <input type="file" id="cameraInput" accept="image/*" style="display:none" onchange="loadImage(event)">
+    <button onclick="document.getElementById('cameraInput').click()">📷 液晶を撮影する</button>
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="loadImage(event)">
 
     <div id="image-container">
         <img id="previewImage">
     </div>
 
-    <button id="saveBtn" style="background: #34c759;" onclick="generatePDF()">PDFを生成して保存</button>
+    <button id="saveBtn" style="background: #34c759;" onclick="generatePDF()">PDFを作成して保存</button>
     <p id="msg" class="status">情報を入力して撮影してください</p>
 </div>
 
@@ -46,73 +46,69 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = document.getElementById('previewImage');
+            img.onload = function() {
+                if (cropper) cropper.destroy();
+                cropper = new Cropper(img, {
+                    aspectRatio: 4 / 3, 
+                    viewMode: 1,
+                    autoCropArea: 0.8,
+                    dragMode: 'move',
+                    checkOrientation: true // iPhoneの写真の向き補正
+                });
+                document.getElementById('msg').innerText = "枠を液晶に合わせて調整してください";
+            };
             img.src = e.target.result;
-
-            if (cropper) cropper.destroy();
-            
-            cropper = new Cropper(img, {
-                aspectRatio: 4 / 3, 
-                viewMode: 1,
-                autoCropArea: 0.8,
-                dragMode: 'move'
-            });
-            document.getElementById('msg').innerText = "枠を液晶に合わせて調整してください";
         };
         reader.readAsDataURL(file);
     }
 
     async function generatePDF() {
         const msg = document.getElementById('msg');
-        msg.innerText = "PDF生成中...";
+        if (!cropper) { msg.innerText = "先に撮影してください"; return; }
+        msg.innerText = "PDF作成中...";
 
         try {
-            // PDFLibから必要な道具を取り出す
             const { PDFDocument, rgb, StandardFonts } = PDFLib;
             const pdfDoc = await PDFDocument.create();
-            const page = pdfDoc.addPage([595.28, 841.89]); // A4サイズ
+            const page = pdfDoc.addPage([595.28, 841.89]); // A4
 
-            // フォントの設定（ここを修正しました）
             const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
             const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-            const name = document.getElementById('patientName').value || "No Name";
-            const id = document.getElementById('idNumber').value || "No ID";
+            const name = document.getElementById('patientName').value || "None";
+            const id = document.getElementById('idNumber').value || "None";
 
-            // 文字の配置
+            // テキスト書き込み
             page.drawText('PCR TEST RESULT', { x: 50, y: 780, size: 24, font: fontBold });
             page.drawText(`Owner: ${name}`, { x: 50, y: 740, size: 16, font: fontRegular });
             page.drawText(`ID: ${id}`, { x: 50, y: 715, size: 16, font: fontRegular });
-            
-            page.drawLine({
-                start: { x: 50, y: 700 },
-                end: { x: 545, y: 700 },
-                thickness: 2,
-                color: rgb(0, 0, 0),
+            page.drawLine({ start: { x: 50, y: 700 }, end: { x: 545, y: 700 }, thickness: 2, color: rgb(0, 0, 0) });
+
+            // 画像処理（真っ黒対策：サイズを制限して抽出）
+            const canvas = cropper.getCroppedCanvas({
+                width: 800, // ここでサイズを制限してメモリ負荷を下げる
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high'
             });
+            
+            const imgData = canvas.toDataURL('image/jpeg', 0.8);
+            const jpgImage = await pdfDoc.embedJpg(imgData);
+            
+            const targetWidth = 500;
+            const targetHeight = (jpgImage.height / jpgImage.width) * targetWidth;
 
-            if (cropper) {
-                const canvas = cropper.getCroppedCanvas({ width: 1000 });
-                const imgData = canvas.toDataURL('image/jpeg', 0.9);
-                const jpgImage = await pdfDoc.embedJpg(imgData);
-                
-                const targetWidth = 500;
-                const targetHeight = (jpgImage.height / jpgImage.width) * targetWidth;
-
-                // 画像を中央より下側に配置
-                page.drawImage(jpgImage, {
-                    x: 50,
-                    y: 450 - targetHeight, 
-                    width: targetWidth,
-                    height: targetHeight,
-                });
-                
-                page.drawText('Test Image (PCR Graph):', { x: 50, y: 460, size: 12, font: fontBold });
-            }
+            page.drawImage(jpgImage, {
+                x: 50,
+                y: 450 - targetHeight, 
+                width: targetWidth,
+                height: targetHeight,
+            });
+            
+            page.drawText('Test Image (PCR Graph):', { x: 50, y: 465, size: 12, font: fontBold });
 
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
             
-            // iPhoneでもダウンロードしやすいように処理
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = `Result_${name}.pdf`;
@@ -120,7 +116,7 @@
             link.click();
             document.body.removeChild(link);
             
-            msg.innerText = "PDFを保存しました！";
+            msg.innerText = "保存完了！";
         } catch (error) {
             console.error(error);
             msg.innerText = "エラー: " + error.message;
