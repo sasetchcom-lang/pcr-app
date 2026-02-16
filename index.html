@@ -13,9 +13,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
     <style>
-        body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 20px; background: #f0f4f8; max-width: 500px; margin: auto; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f4f8; max-width: 500px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { font-size: 1.1em; color: #333; margin-bottom: 20px; text-align: center; }
         label { font-size: 0.9em; color: #666; font-weight: bold; }
         input { width: 100%; padding: 12px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
@@ -27,7 +26,7 @@
 <body>
 
 <div class="card">
-    <h2>🏥 FCoV検査結果報告書 作成</h2>
+    <h2 style="text-align:center; font-size:1.1em;">🏥 FCoV検査結果報告書 作成</h2>
     <label>Pet ID (半角英数)</label>
     <input type="text" id="petId" placeholder="例: 1771234095209">
     <label>Pet Name (全角日本語)</label>
@@ -66,60 +65,57 @@
             const pdfDoc = await PDFDocument.create();
             pdfDoc.registerFontkit(fontkit);
 
-            // フォントを軽量なものへ（読み込み失敗時の対策含む）
+            // フォント読み込み（プリンター互換性の高いソース）
             const fontUrl = 'https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf';
             const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
-            const jpFont = await pdfDoc.embedFont(fontBytes, { subset: true }); // サブセット化で軽量化
+            const jpFont = await pdfDoc.embedFont(fontBytes);
 
             const page = pdfDoc.addPage([595.28, 841.89]);
             const petId = document.getElementById('petId').value || " ";
             const petName = document.getElementById('petName').value || " ";
-            
             const today = new Date();
             const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
-            const headerX = 350;
-            page.drawText('ユーミーどうぶつ病院', { x: headerX, y: 810, size: 16, font: jpFont });
-            page.drawText('〒285-0837 千葉県佐倉市王子台4-14-12', { x: headerX, y: 795, size: 8, font: jpFont });
-            page.drawText('TEL: 043-309-6085', { x: headerX, y: 785, size: 8, font: jpFont });
-            page.drawText(`書類作成日: ${dateStr}`, { x: headerX, y: 775, size: 8, font: jpFont });
+            // ヘッダー（右寄せ・左端揃え）
+            const hX = 350;
+            page.drawText('ユーミーどうぶつ病院', { x: hX, y: 810, size: 16, font: jpFont });
+            page.drawText('〒285-0837 千葉県佐倉市王子台4-14-12', { x: hX, y: 795, size: 8, font: jpFont });
+            page.drawText('TEL: 043-309-6085', { x: hX, y: 785, size: 8, font: jpFont });
+            page.drawText(`書類作成日: ${dateStr}`, { x: hX, y: 775, size: 8, font: jpFont });
 
+            // タイトル
             page.drawText('ネココロナウイルス（FCoV）検査結果報告書', { x: 50, y: 735, size: 18, font: jpFont });
             page.drawLine({ start: { x: 50, y: 725 }, end: { x: 545, y: 725 }, thickness: 1.5, color: rgb(0, 0, 0) });
 
+            // 個体情報
             page.drawText(`Pet ID: ${petId}`, { x: 50, y: 700, size: 12, font: jpFont });
             page.drawText(`Pet Name: ${petName}`, { x: 50, y: 680, size: 12, font: jpFont });
 
             if (cropper) {
-                // 解像度をプリンター向けに最適化 (800px)
-                const canvas = cropper.getCroppedCanvas({ width: 800 });
-                const imgData = canvas.toDataURL('image/jpeg', 0.75); // 圧縮率を少し上げる
+                // 画像サイズをプリンターの処理能力に合わせてさらに最適化 (720px)
+                const canvas = cropper.getCroppedCanvas({ width: 720 });
+                const imgData = canvas.toDataURL('image/jpeg', 0.7); // 圧縮率を最適化
                 const jpgImage = await pdfDoc.embedJpg(imgData);
                 const imgW = 480;
                 const imgH = (jpgImage.height / jpgImage.width) * imgW;
-                
                 page.drawImage(jpgImage, { x: 57, y: 640 - imgH, width: imgW, height: imgH });
                 
-                const resultY = 610 - imgH;
-                page.drawText('【 判定結果 】', { x: 50, y: resultY, size: 14, font: jpFont });
-                page.drawText('陽性 (Positive)   /   陰性 (Negative)   /   判定保留 (Inconclusive)', { x: 70, y: resultY - 40, size: 16, font: jpFont });
-                page.drawText('※ 獣医師が上記いずれかに ○ を記入してください。', { x: 50, y: resultY - 75, size: 10, font: jpFont });
-                
-                page.drawText('判定獣医師印：', { x: 400, y: resultY - 110, size: 11, font: jpFont });
-                page.drawLine({ start: { x: 475, y: resultY - 112 }, end: { x: 545, y: resultY - 112 }, thickness: 0.5, color: rgb(0,0,0) });
+                const rY = 610 - imgH;
+                page.drawText('【 判定結果 】', { x: 50, y: rY, size: 14, font: jpFont });
+                page.drawText('陽性 (Positive)   /   陰性 (Negative)   /   判定保留 (Inconclusive)', { x: 70, y: rY - 40, size: 16, font: jpFont });
+                page.drawText('※ 獣医師が上記いずれかに ○ を記入してください。', { x: 50, y: rY - 75, size: 10, font: jpFont });
+                page.drawText('判定獣医師印：', { x: 400, y: rY - 110, size: 11, font: jpFont });
+                page.drawLine({ start: { x: 475, y: rY - 112 }, end: { x: 545, y: rY - 112 }, thickness: 0.5, color: rgb(0,0,0) });
             }
 
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            
-            // 保存用リンク
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = `FCoV_Report_${petName}.pdf`;
             link.click();
-            msg.innerText = "保存完了しました";
+            msg.innerText = "保存完了！iPhoneの「プリント」機能もお試しください。";
         } catch (error) {
-            console.error(error);
             msg.innerText = "エラー: " + error.message;
         }
     }
