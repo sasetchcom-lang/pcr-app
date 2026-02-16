@@ -3,37 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PCR検査結果作成アプリ</title>
+    <title>FCoV検査結果報告書作成</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f4f8; max-width: 500px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { font-size: 1.2em; color: #333; margin-top: 0; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #image-container { margin-top: 20px; border-radius: 8px; overflow: hidden; background: #eee; min-height: 200px; }
+        h2 { font-size: 1.1em; color: #333; margin-bottom: 20px; text-align: center; }
+        label { font-size: 0.9em; color: #666; font-weight: bold; }
+        input { width: 100%; padding: 12px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        #image-container { margin-top: 20px; border-radius: 8px; overflow: hidden; background: #eee; }
         img { max-width: 100%; display: block; }
-        .status { font-size: 13px; color: #666; margin-top: 10px; text-align: center; font-weight: bold; }
+        .status { font-size: 13px; color: #d32f2f; margin-top: 10px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>🏥 PCR検査結果 PDF作成（とりあえず半角で書いて）</h2>
-    <input type="text" id="patientName" placeholder="飼い主名">
-    <input type="text" id="idNumber" placeholder="診察券番号">
-    
-    <button onclick="document.getElementById('cameraInput').click()">📷 液晶を撮影する</button>
+    <h2>🏥 FCoV検査結果報告書 作成</h2>
+    <label>Pet ID (半角英数)</label>
+    <input type="text" id="petId" placeholder="例: 1771234095209">
+    <label>Pet Name (全角日本語)</label>
+    <input type="text" id="petName" placeholder="例: 清水 ノア">
+    <button onclick="document.getElementById('cameraInput').click()">📷 グラフを撮影</button>
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="loadImage(event)">
-
-    <div id="image-container">
-        <img id="previewImage">
-    </div>
-
-    <button id="saveBtn" style="background: #34c759;" onclick="generatePDF()">PDFを作成して保存</button>
-    <p id="msg" class="status">情報を入力して撮影してください</p>
+    <div id="image-container"><img id="previewImage"></div>
+    <button id="saveBtn" style="background: #34c759; margin-top: 20px;" onclick="generatePDF()">PDFを生成して保存</button>
+    <p id="msg" class="status"></p>
 </div>
 
 <script>
@@ -42,20 +41,13 @@
     function loadImage(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = document.getElementById('previewImage');
             img.onload = function() {
                 if (cropper) cropper.destroy();
-                cropper = new Cropper(img, {
-                    aspectRatio: 4 / 3, 
-                    viewMode: 1,
-                    autoCropArea: 0.8,
-                    dragMode: 'move',
-                    checkOrientation: true // iPhoneの写真の向き補正
-                });
-                document.getElementById('msg').innerText = "枠を液晶に合わせて調整してください";
+                cropper = new Cropper(img, { aspectRatio: 16 / 9, viewMode: 1, autoCropArea: 0.9 });
+                document.getElementById('msg').innerText = "枠を調整してください";
             };
             img.src = e.target.result;
         };
@@ -64,65 +56,74 @@
 
     async function generatePDF() {
         const msg = document.getElementById('msg');
-        if (!cropper) { msg.innerText = "先に撮影してください"; return; }
-        msg.innerText = "PDF作成中...";
-
+        msg.innerText = "作成中...";
         try {
             const { PDFDocument, rgb, StandardFonts } = PDFLib;
             const pdfDoc = await PDFDocument.create();
-            const page = pdfDoc.addPage([595.28, 841.89]); // A4
+            pdfDoc.registerFontkit(fontkit);
 
+            const fontUrl = 'https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf';
+            const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
+            const jpFont = await pdfDoc.embedFont(fontBytes);
             const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-            const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-            const name = document.getElementById('patientName').value || "None";
-            const id = document.getElementById('idNumber').value || "None";
-
-            // テキスト書き込み
-            page.drawText('PCR TEST RESULT', { x: 50, y: 780, size: 24, font: fontBold });
-            page.drawText(`Owner: ${name}`, { x: 50, y: 740, size: 16, font: fontRegular });
-            page.drawText(`ID: ${id}`, { x: 50, y: 715, size: 16, font: fontRegular });
-            page.drawLine({ start: { x: 50, y: 700 }, end: { x: 545, y: 700 }, thickness: 2, color: rgb(0, 0, 0) });
-
-            // 画像処理（真っ黒対策：サイズを制限して抽出）
-            const canvas = cropper.getCroppedCanvas({
-                width: 800, // ここでサイズを制限してメモリ負荷を下げる
-                imageSmoothingEnabled: true,
-                imageSmoothingQuality: 'high'
-            });
+            const page = pdfDoc.addPage([595.28, 841.89]);
+            const petId = document.getElementById('petId').value || " ";
+            const petName = document.getElementById('petName').value || " ";
             
-            const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            const jpgImage = await pdfDoc.embedJpg(imgData);
-            
-            const targetWidth = 500;
-            const targetHeight = (jpgImage.height / jpgImage.width) * targetWidth;
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
-            page.drawImage(jpgImage, {
-                x: 50,
-                y: 450 - targetHeight, 
-                width: targetWidth,
-                height: targetHeight,
-            });
-            
-            page.drawText('Test Image (PCR Graph):', { x: 50, y: 465, size: 12, font: fontBold });
+            // --- ヘッダー（右側）病院名・連絡先 ---
+            page.drawText('YOU ME ANIMAL CLINIC', { x: 340, y: 810, size: 14, font: fontBold });
+            page.drawText('Address: 4-14-12 Ojidai, Sakura-shi, Chiba 285-0837, Japan', { x: 320, y: 798, size: 7.5, font: jpFont });
+            page.drawText('TEL: 043-309-6085', { x: 457, y: 786, size: 7.5, font: jpFont });
+            page.drawText(`書類作成日: ${dateStr}`, { x: 457, y: 774, size: 7.5, font: jpFont });
+
+            // --- メインタイトル ---
+            page.drawText('ネココロナウイルス（FCoV）検査結果報告書', { x: 50, y: 740, size: 18, font: jpFont });
+            page.drawLine({ start: { x: 50, y: 730 }, end: { x: 545, y: 730 }, thickness: 1.5, color: rgb(0, 0, 0) });
+
+            // --- 個体情報 ---
+            page.drawText(`Pet ID: ${petId}`, { x: 50, y: 705, size: 12, font: jpFont });
+            page.drawText(`Pet Name: ${petName}`, { x: 50, y: 685, size: 12, font: jpFont });
+
+            if (cropper) {
+                const canvas = cropper.getCroppedCanvas({ width: 800 });
+                const imgData = canvas.toDataURL('image/jpeg', 0.8);
+                const jpgImage = await pdfDoc.embedJpg(imgData);
+                const imgW = 480;
+                const imgH = (jpgImage.height / jpgImage.width) * imgW;
+                
+                // 画像配置
+                page.drawImage(jpgImage, { x: 57, y: 650 - imgH, width: imgW, height: imgH });
+                
+                // 判定結果エリア
+                const resultY = 620 - imgH;
+                page.drawText('【 判定結果 】', { x: 50, y: resultY, size: 14, font: jpFont });
+                
+                // 判定項目の配置（陽性 / 陰性 / 判定保留）
+                page.drawText('陽性 (Positive)   /   陰性 (Negative)   /   判定保留 (Inconclusive)', { x: 70, y: resultY - 40, size: 16, font: jpFont });
+                
+                page.drawText('※ 獣医師が上記いずれかに ○ を記入してください。', { x: 50, y: resultY - 75, size: 10, font: jpFont });
+                
+                // 右下にサインスペース
+                page.drawText('判定獣医師印：', { x: 400, y: resultY - 110, size: 11, font: jpFont });
+                page.drawLine({ start: { x: 475, y: resultY - 112 }, end: { x: 545, y: resultY - 112 }, thickness: 0.5, color: rgb(0,0,0) });
+            }
 
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `Result_${name}.pdf`;
-            document.body.appendChild(link);
+            link.download = `FCoV_Report_${petName}.pdf`;
             link.click();
-            document.body.removeChild(link);
-            
-            msg.innerText = "保存完了！";
+            msg.innerText = "保存完了しました";
         } catch (error) {
             console.error(error);
             msg.innerText = "エラー: " + error.message;
         }
     }
 </script>
-
 </body>
 </html>
