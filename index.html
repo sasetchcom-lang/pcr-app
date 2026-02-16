@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FCoV検査">
+    
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
@@ -61,14 +62,14 @@
         const msg = document.getElementById('msg');
         msg.innerText = "作成中...";
         try {
-            const { PDFDocument, rgb, StandardFonts } = PDFLib;
+            const { PDFDocument, rgb } = PDFLib;
             const pdfDoc = await PDFDocument.create();
             pdfDoc.registerFontkit(fontkit);
 
+            // フォントを軽量なものへ（読み込み失敗時の対策含む）
             const fontUrl = 'https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf';
             const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
-            const jpFont = await pdfDoc.embedFont(fontBytes);
-            const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+            const jpFont = await pdfDoc.embedFont(fontBytes, { subset: true }); // サブセット化で軽量化
 
             const page = pdfDoc.addPage([595.28, 841.89]);
             const petId = document.getElementById('petId').value || " ";
@@ -77,24 +78,22 @@
             const today = new Date();
             const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
-            // --- ヘッダー（右寄せ・左端揃え） ---
-            const headerX = 350; // 全ての情報の開始位置（X座標）を統一
+            const headerX = 350;
             page.drawText('ユーミーどうぶつ病院', { x: headerX, y: 810, size: 16, font: jpFont });
-            page.drawText('　〒285-0837 千葉県佐倉市王子台4-14-12', { x: headerX, y: 795, size: 8, font: jpFont });
-            page.drawText('　TEL: 043-309-6085', { x: headerX, y: 785, size: 8, font: jpFont });
-            page.drawText(`　書類作成日: ${dateStr}`, { x: headerX, y: 775, size: 8, font: jpFont });
+            page.drawText('〒285-0837 千葉県佐倉市王子台4-14-12', { x: headerX, y: 795, size: 8, font: jpFont });
+            page.drawText('TEL: 043-309-6085', { x: headerX, y: 785, size: 8, font: jpFont });
+            page.drawText(`書類作成日: ${dateStr}`, { x: headerX, y: 775, size: 8, font: jpFont });
 
-            // --- メインタイトル ---
             page.drawText('ネココロナウイルス（FCoV）検査結果報告書', { x: 50, y: 735, size: 18, font: jpFont });
             page.drawLine({ start: { x: 50, y: 725 }, end: { x: 545, y: 725 }, thickness: 1.5, color: rgb(0, 0, 0) });
 
-            // --- 個体情報 ---
             page.drawText(`Pet ID: ${petId}`, { x: 50, y: 700, size: 12, font: jpFont });
             page.drawText(`Pet Name: ${petName}`, { x: 50, y: 680, size: 12, font: jpFont });
 
             if (cropper) {
+                // 解像度をプリンター向けに最適化 (800px)
                 const canvas = cropper.getCroppedCanvas({ width: 800 });
-                const imgData = canvas.toDataURL('image/jpeg', 0.8);
+                const imgData = canvas.toDataURL('image/jpeg', 0.75); // 圧縮率を少し上げる
                 const jpgImage = await pdfDoc.embedJpg(imgData);
                 const imgW = 480;
                 const imgH = (jpgImage.height / jpgImage.width) * imgW;
@@ -112,9 +111,11 @@
 
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            
+            // 保存用リンク
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `FCoV_報告書_${petName}.pdf`;
+            link.download = `FCoV_Report_${petName}.pdf`;
             link.click();
             msg.innerText = "保存完了しました";
         } catch (error) {
