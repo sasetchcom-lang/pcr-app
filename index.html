@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f4f8; max-width: 500px; margin: auto; }
+        body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 20px; background: #f0f4f8; max-width: 500px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h2 { font-size: 1.1em; color: #333; margin-bottom: 20px; text-align: center; }
         label { font-size: 0.9em; color: #666; font-weight: bold; }
@@ -74,19 +74,20 @@
             const today = new Date();
             const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
-            // --- ヘッダー（右側）病院名・連絡先 ---
-            page.drawText('YOU ME ANIMAL CLINIC', { x: 340, y: 810, size: 14, font: fontBold });
-            page.drawText('Address: 4-14-12 Ojidai, Sakura-shi, Chiba 285-0837, Japan', { x: 320, y: 798, size: 7.5, font: jpFont });
-            page.drawText('TEL: 043-309-6085', { x: 457, y: 786, size: 7.5, font: jpFont });
-            page.drawText(`書類作成日: ${dateStr}`, { x: 457, y: 774, size: 7.5, font: jpFont });
+            // --- ヘッダー（右寄せ・左端揃え） ---
+            const headerX = 350; // 全ての情報の開始位置（X座標）を統一
+            page.drawText('ユーミーどうぶつ病院', { x: headerX, y: 810, size: 16, font: jpFont });
+            page.drawText('　〒285-0837 千葉県佐倉市王子台4-14-12', { x: headerX, y: 795, size: 8, font: jpFont });
+            page.drawText('　TEL: 043-309-6085', { x: headerX, y: 785, size: 8, font: jpFont });
+            page.drawText(`　書類作成日: ${dateStr}`, { x: headerX, y: 775, size: 8, font: jpFont });
 
             // --- メインタイトル ---
-            page.drawText('ネココロナウイルス（FCoV）検査結果報告書', { x: 50, y: 740, size: 18, font: jpFont });
-            page.drawLine({ start: { x: 50, y: 730 }, end: { x: 545, y: 730 }, thickness: 1.5, color: rgb(0, 0, 0) });
+            page.drawText('ネココロナウイルス（FCoV）検査結果報告書', { x: 50, y: 735, size: 18, font: jpFont });
+            page.drawLine({ start: { x: 50, y: 725 }, end: { x: 545, y: 725 }, thickness: 1.5, color: rgb(0, 0, 0) });
 
             // --- 個体情報 ---
-            page.drawText(`Pet ID: ${petId}`, { x: 50, y: 705, size: 12, font: jpFont });
-            page.drawText(`Pet Name: ${petName}`, { x: 50, y: 685, size: 12, font: jpFont });
+            page.drawText(`Pet ID: ${petId}`, { x: 50, y: 700, size: 12, font: jpFont });
+            page.drawText(`Pet Name: ${petName}`, { x: 50, y: 680, size: 12, font: jpFont });
 
             if (cropper) {
                 const canvas = cropper.getCroppedCanvas({ width: 800 });
@@ -95,19 +96,13 @@
                 const imgW = 480;
                 const imgH = (jpgImage.height / jpgImage.width) * imgW;
                 
-                // 画像配置
-                page.drawImage(jpgImage, { x: 57, y: 650 - imgH, width: imgW, height: imgH });
+                page.drawImage(jpgImage, { x: 57, y: 640 - imgH, width: imgW, height: imgH });
                 
-                // 判定結果エリア
-                const resultY = 620 - imgH;
+                const resultY = 610 - imgH;
                 page.drawText('【 判定結果 】', { x: 50, y: resultY, size: 14, font: jpFont });
-                
-                // 判定項目の配置（陽性 / 陰性 / 判定保留）
                 page.drawText('陽性 (Positive)   /   陰性 (Negative)   /   判定保留 (Inconclusive)', { x: 70, y: resultY - 40, size: 16, font: jpFont });
-                
                 page.drawText('※ 獣医師が上記いずれかに ○ を記入してください。', { x: 50, y: resultY - 75, size: 10, font: jpFont });
                 
-                // 右下にサインスペース
                 page.drawText('判定獣医師印：', { x: 400, y: resultY - 110, size: 11, font: jpFont });
                 page.drawLine({ start: { x: 475, y: resultY - 112 }, end: { x: 545, y: resultY - 112 }, thickness: 0.5, color: rgb(0,0,0) });
             }
@@ -116,7 +111,7 @@
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `FCoV_Report_${petName}.pdf`;
+            link.download = `FCoV_報告書_${petName}.pdf`;
             link.click();
             msg.innerText = "保存完了しました";
         } catch (error) {
