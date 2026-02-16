@@ -64,8 +64,11 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             ctx.fillStyle = "#000000";
-            const today = new Date();
-            const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+            
+            // --- 日時と時間の取得 ---
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
             ctx.textAlign = "right";
             ctx.font = "bold 32px sans-serif";
@@ -73,7 +76,7 @@
             ctx.font = "22px sans-serif";
             ctx.fillText("〒285-0837 千葉県佐倉市王子台4-14-12", 1140, 140);
             ctx.fillText("TEL: 043-309-6085", 1140, 175);
-            ctx.fillText("書類作成日: " + dateStr, 1140, 210);
+            ctx.fillText(`書類作成日時: ${dateStr} ${timeStr}`, 1140, 210);
 
             ctx.textAlign = "left";
             ctx.font = "bold 45px sans-serif";
@@ -95,8 +98,7 @@
                 ctx.font = "bold 35px sans-serif";
                 ctx.fillText("【 判定結果 】", 100, nextY);
                 
-                // --- 文字サイズを調整して 1140（右端）に収まるように配置 ---
-                ctx.font = "32px sans-serif";
+                ctx.font = "31px sans-serif"; // さらに1px小さくして余裕を持たせました
                 ctx.fillText("陽性 (Positive)   /   陰性 (Negative)   /   判定保留 (Inconclusive)", 100, nextY + 80);
                 
                 ctx.font = "22px sans-serif";
